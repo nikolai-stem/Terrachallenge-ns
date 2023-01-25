@@ -1,5 +1,5 @@
 # Terraform Providers
 .terraform/
 terraform.tfstate
-
 terraform.tfstate.backup
+mypass.txt
