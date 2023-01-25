@@ -15,6 +15,6 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-tftraining-nstem"
-  location = "eastus"
+  name     = var.resource_group_name
+  location = var.resource_location_name
 }
