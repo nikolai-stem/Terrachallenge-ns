@@ -43,18 +43,6 @@ resource "azurerm_subnet" "deployment-lb" {
   address_prefixes     = ["10.0.0.8/29"]
 }
 
-resource "azurerm_network_interface" "deployment" {
-  name                = var.web_server_deployment.nic_name
-  location            = azurerm_resource_group.deployment.location
-  resource_group_name = azurerm_resource_group.deployment.name
-
-  ip_configuration {
-    name                          = var.web_server_deployment.nic_ipconfig_name
-    subnet_id                     = azurerm_subnet.deployment-web.id
-    private_ip_address_allocation = "Dynamic"
-  }
-}
-
 resource "azurerm_public_ip" "deployment" {
   name                = var.lb_params.public_ip_name
   resource_group_name = azurerm_resource_group.deployment.name
@@ -94,14 +82,39 @@ resource "azurerm_lb_probe" "deployment" {
   port            = 80
 }
 
+resource "azurerm_availability_set" "deployment" {
+  name                = "tcns-availabilityset-prd"
+  resource_group_name = azurerm_resource_group.deployment.name
+  location            = azurerm_resource_group.deployment.location
+}
+
+resource "azurerm_network_interface" "deployment" {
+  count = var.vm_params.count
+
+  name                = "${var.web_server_deployment.nic_name}-${count.index}"
+  location            = azurerm_resource_group.deployment.location
+  resource_group_name = azurerm_resource_group.deployment.name
+
+
+  ip_configuration {
+    name                          = var.web_server_deployment.nic_ipconfig_name
+    subnet_id                     = azurerm_subnet.deployment-web.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
 resource "azurerm_network_interface_backend_address_pool_association" "deployment" {
-  network_interface_id    = azurerm_network_interface.deployment.id
-  ip_configuration_name   = azurerm_network_interface.deployment.ip_configuration[0].name
+  count = var.vm_params.count
+
+  network_interface_id    = element(azurerm_network_interface.deployment, count.index).id
+  ip_configuration_name   = element(azurerm_network_interface.deployment, count.index).ip_configuration[0].name
   backend_address_pool_id = azurerm_lb_backend_address_pool.deployment.id
 }
 
 resource "azurerm_linux_virtual_machine" "deployment" {
-  name                = var.web_server_deployment.vm_name
+  count = var.vm_params.count
+
+  name                = "${var.web_server_deployment.vm_name}-${count.index}"
   resource_group_name = azurerm_resource_group.deployment.name
   location            = azurerm_resource_group.deployment.location
   size                = var.vm_params.size
@@ -111,8 +124,10 @@ resource "azurerm_linux_virtual_machine" "deployment" {
   disable_password_authentication = false
 
   network_interface_ids = [
-    azurerm_network_interface.deployment.id,
+    element(azurerm_network_interface.deployment, count.index).id,
   ]
+
+  availability_set_id = azurerm_availability_set.deployment.id
 
   os_disk {
     caching              = var.vm_params.os_disk.caching
@@ -127,18 +142,20 @@ resource "azurerm_linux_virtual_machine" "deployment" {
   }
 }
 
+resource "azurerm_virtual_machine_extension" "deployment" {
+  count = var.vm_params.count
+
+  name                 = "${var.vm_params.extension.name}-${count.index}"
+  virtual_machine_id   = element(azurerm_linux_virtual_machine.deployment, count.index).id
+  publisher            = var.vm_params.extension.publisher
+  type                 = var.vm_params.extension.type
+  type_handler_version = var.vm_params.extension.type_handler_version
+}
+
 resource "azurerm_key_vault" "deployment" {
   name                = var.kv_params.name
   location            = azurerm_resource_group.deployment.location
   resource_group_name = azurerm_resource_group.deployment.name
   sku_name            = var.kv_params.sku_name
   tenant_id           = data.azurerm_client_config.current.tenant_id
-}
-
-resource "azurerm_virtual_machine_extension" "deployment" {
-  name                 = var.vm_params.extension.name
-  virtual_machine_id   = azurerm_linux_virtual_machine.deployment.id
-  publisher            = var.vm_params.extension.publisher
-  type                 = var.vm_params.extension.type
-  type_handler_version = var.vm_params.extension.type_handler_version
 }

@@ -13,6 +13,7 @@ web_server_deployment = {
 vm_params = {
   size       = "Standard_A1_v2"
   admin_name = "web-vm-admin"
+  count      = 3
 
   os_disk = {
     caching              = "ReadWrite"

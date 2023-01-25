@@ -28,6 +28,7 @@ variable "vm_params" {
   type = object({
     size       = string
     admin_name = string
+    count      = number
 
     os_disk = object({
       caching              = string
