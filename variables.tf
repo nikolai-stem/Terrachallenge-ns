@@ -24,6 +24,14 @@ variable "web_server_deployment" {
   })
 }
 
+variable "vm_list" {
+  type = map(object({
+    size       = string
+    admin_name = string
+    NIC_index  = number
+  }))
+}
+
 variable "vm_params" {
   type = object({
     size       = string

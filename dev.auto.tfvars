@@ -13,7 +13,7 @@ web_server_deployment = {
 vm_params = {
   size       = "Standard_A1_v2"
   admin_name = "web-vm-admin"
-  count      = 3
+  count      = 2
 
   os_disk = {
     caching              = "ReadWrite"
@@ -32,6 +32,19 @@ vm_params = {
     publisher            = "Microsoft.Azure.Extensions"
     type                 = "CustomScript"
     type_handler_version = "2.0"
+  }
+}
+
+vm_list = {
+  VM1 = {
+    admin_name = "web-vm-admin"
+    size       = "Standard_B1s"
+    NIC_index  = 0
+  }
+  VM2 = {
+    admin_name = "api-vm-admin"
+    size       = "Standard_DS1_v2"
+    NIC_index  = 1
   }
 }
 

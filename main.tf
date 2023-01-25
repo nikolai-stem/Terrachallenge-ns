@@ -112,19 +112,19 @@ resource "azurerm_network_interface_backend_address_pool_association" "deploymen
 }
 
 resource "azurerm_linux_virtual_machine" "deployment" {
-  count = var.vm_params.count
+  for_each = var.vm_list
 
-  name                = "${var.web_server_deployment.vm_name}-${count.index}"
+  name                = "${var.web_server_deployment.vm_name}-${each.value.NIC_index}"
   resource_group_name = azurerm_resource_group.deployment.name
   location            = azurerm_resource_group.deployment.location
-  size                = var.vm_params.size
+  size                = each.value.size
 
-  admin_username                  = var.vm_params.admin_name
+  admin_username                  = each.value.admin_name
   admin_password                  = file("./mypass.txt")
   disable_password_authentication = false
 
   network_interface_ids = [
-    element(azurerm_network_interface.deployment, count.index).id,
+    element(azurerm_network_interface.deployment, each.value.NIC_index).id,
   ]
 
   availability_set_id = azurerm_availability_set.deployment.id
@@ -143,10 +143,10 @@ resource "azurerm_linux_virtual_machine" "deployment" {
 }
 
 resource "azurerm_virtual_machine_extension" "deployment" {
-  count = var.vm_params.count
+  for_each = var.vm_list
 
-  name                 = "${var.vm_params.extension.name}-${count.index}"
-  virtual_machine_id   = element(azurerm_linux_virtual_machine.deployment, count.index).id
+  name                 = "${var.vm_params.extension.name}-${each.value.NIC_index}"
+  virtual_machine_id   = azurerm_linux_virtual_machine.deployment[each.key].id
   publisher            = var.vm_params.extension.publisher
   type                 = var.vm_params.extension.type
   type_handler_version = var.vm_params.extension.type_handler_version
