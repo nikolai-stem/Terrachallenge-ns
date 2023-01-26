@@ -6,6 +6,12 @@ terraform {
       version = "~> 3.0.2"
     }
   }
+  backend "azurerm" {
+    resource_group_name  = "rg-loadbalanced-webserver"
+    storage_account_name = "tcnstfstate"
+    container_name       = "tfstate"
+    key                  = "terraform.tfstate"
+  }
 
   required_version = ">= 1.1.0"
 }
@@ -62,4 +68,23 @@ module "vm" {
       source_image_reference = var.vm_source_image_reference
     }
   }
+}
+
+resource "azurerm_storage_account" "tfstate" {
+  name                     = "tcnstfstate"
+  resource_group_name      = var.project.rg.name
+  location                 = var.project.rg.location
+  account_kind             = "BlobStorage"
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_storage_container" "tfstate" {
+  name                 = "tfstate"
+  storage_account_name = "tcnstfstate"
+}
+
+resource "azurerm_storage_container" "tfstate2" {
+  name                 = "testcontainer"
+  storage_account_name = "tcnstfstate"
 }
