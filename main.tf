@@ -14,148 +14,52 @@ provider "azurerm" {
   features {}
 }
 
-data "azurerm_client_config" "current" {}
+module "rg" {
+  source = "./modules/rg"
 
-resource "azurerm_resource_group" "deployment" {
-  name     = var.resource_group_name
-  location = var.resource_location_name
+  proj = var.project.proj
+  rg   = var.project.rg
 }
 
-# Full deployment
-resource "azurerm_virtual_network" "deployment" {
-  name                = var.web_server_deployment.vnet_name
-  address_space       = ["10.0.0.0/28"]
-  location            = azurerm_resource_group.deployment.location
-  resource_group_name = azurerm_resource_group.deployment.name
+module "vnet" {
+  source = "./modules/vnet"
+
+  proj = var.project.proj
+  rg   = var.project.rg
 }
 
-resource "azurerm_subnet" "deployment-web" {
-  name                 = var.web_server_deployment.subnet_web_name
-  resource_group_name  = azurerm_resource_group.deployment.name
-  virtual_network_name = azurerm_virtual_network.deployment.name
-  address_prefixes     = ["10.0.0.0/29"]
+module "lb" {
+  source = "./modules/lb"
+
+  proj                 = var.project.proj
+  rg                   = var.project.rg
+  public_ip_address_id = module.vnet.public_ip
 }
 
-resource "azurerm_subnet" "deployment-lb" {
-  name                 = var.web_server_deployment.subnet_lb_name
-  resource_group_name  = azurerm_resource_group.deployment.name
-  virtual_network_name = azurerm_virtual_network.deployment.name
-  address_prefixes     = ["10.0.0.8/29"]
-}
+module "vm" {
+  source = "./modules/vm"
 
-resource "azurerm_public_ip" "deployment" {
-  name                = var.lb_params.public_ip_name
-  resource_group_name = azurerm_resource_group.deployment.name
-  location            = azurerm_resource_group.deployment.location
-  allocation_method   = var.lb_params.public_ip_allocation
-}
+  proj                    = var.project.proj
+  rg                      = var.project.rg
+  vm_subnet_id            = module.vnet.vm_subnet_id
+  backend_address_pool_id = module.lb.backend_address_pool_id
+  vm_extension            = var.vm_extension_params
 
-resource "azurerm_lb" "deployment" {
-  name                = var.lb_params.name
-  resource_group_name = azurerm_resource_group.deployment.name
-  location            = azurerm_resource_group.deployment.location
-  frontend_ip_configuration {
-    name                 = var.lb_params.frontend_ipconfig_name
-    public_ip_address_id = azurerm_public_ip.deployment.id
+  vm_list = {
+    main = {
+      admin_name             = "admin-main"
+      admin_pass             = file("./mypass.txt")
+      os_disk                = var.vm_os_disk
+      sku_size               = "Standard_B1s"
+      source_image_reference = var.vm_source_image_reference
+    }
+
+    aux = {
+      admin_name             = "admin-aux"
+      admin_pass             = file("./mypass.txt")
+      os_disk                = var.vm_os_disk
+      sku_size               = "Standard_DS1_v2"
+      source_image_reference = var.vm_source_image_reference
+    }
   }
-}
-
-resource "azurerm_lb_backend_address_pool" "deployment" {
-  loadbalancer_id = azurerm_lb.deployment.id
-  name            = var.lb_params.backend_pool_name
-}
-
-resource "azurerm_lb_rule" "deployment" {
-  name                           = var.lb_params.rule
-  loadbalancer_id                = azurerm_lb.deployment.id
-  frontend_ip_configuration_name = azurerm_lb.deployment.frontend_ip_configuration[0].name
-  protocol                       = "Tcp"
-  frontend_port                  = 80
-  backend_port                   = 80
-  backend_address_pool_ids       = ["${azurerm_lb_backend_address_pool.deployment.id}"]
-  probe_id                       = azurerm_lb_probe.deployment.id
-}
-
-resource "azurerm_lb_probe" "deployment" {
-  name            = var.lb_params.probe
-  loadbalancer_id = azurerm_lb.deployment.id
-  port            = 80
-}
-
-resource "azurerm_availability_set" "deployment" {
-  name                = "tcns-availabilityset-prd"
-  resource_group_name = azurerm_resource_group.deployment.name
-  location            = azurerm_resource_group.deployment.location
-}
-
-resource "azurerm_network_interface" "deployment" {
-  count = var.vm_params.count
-
-  name                = "${var.web_server_deployment.nic_name}-${count.index}"
-  location            = azurerm_resource_group.deployment.location
-  resource_group_name = azurerm_resource_group.deployment.name
-
-
-  ip_configuration {
-    name                          = var.web_server_deployment.nic_ipconfig_name
-    subnet_id                     = azurerm_subnet.deployment-web.id
-    private_ip_address_allocation = "Dynamic"
-  }
-}
-
-resource "azurerm_network_interface_backend_address_pool_association" "deployment" {
-  count = var.vm_params.count
-
-  network_interface_id    = element(azurerm_network_interface.deployment, count.index).id
-  ip_configuration_name   = element(azurerm_network_interface.deployment, count.index).ip_configuration[0].name
-  backend_address_pool_id = azurerm_lb_backend_address_pool.deployment.id
-}
-
-resource "azurerm_linux_virtual_machine" "deployment" {
-  for_each = var.vm_list
-
-  name                = "${var.web_server_deployment.vm_name}-${each.value.NIC_index}"
-  resource_group_name = azurerm_resource_group.deployment.name
-  location            = azurerm_resource_group.deployment.location
-  size                = each.value.size
-
-  admin_username                  = each.value.admin_name
-  admin_password                  = file("./mypass.txt")
-  disable_password_authentication = false
-
-  network_interface_ids = [
-    element(azurerm_network_interface.deployment, each.value.NIC_index).id,
-  ]
-
-  availability_set_id = azurerm_availability_set.deployment.id
-
-  os_disk {
-    caching              = var.vm_params.os_disk.caching
-    storage_account_type = var.vm_params.os_disk.storage_account_type
-  }
-
-  source_image_reference {
-    publisher = var.vm_params.source_image_reference.publisher
-    offer     = var.vm_params.source_image_reference.offer
-    sku       = var.vm_params.source_image_reference.sku
-    version   = var.vm_params.source_image_reference.version
-  }
-}
-
-resource "azurerm_virtual_machine_extension" "deployment" {
-  for_each = var.vm_list
-
-  name                 = "${var.vm_params.extension.name}-${each.value.NIC_index}"
-  virtual_machine_id   = azurerm_linux_virtual_machine.deployment[each.key].id
-  publisher            = var.vm_params.extension.publisher
-  type                 = var.vm_params.extension.type
-  type_handler_version = var.vm_params.extension.type_handler_version
-}
-
-resource "azurerm_key_vault" "deployment" {
-  name                = var.kv_params.name
-  location            = azurerm_resource_group.deployment.location
-  resource_group_name = azurerm_resource_group.deployment.name
-  sku_name            = var.kv_params.sku_name
-  tenant_id           = data.azurerm_client_config.current.tenant_id
 }
