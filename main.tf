@@ -67,14 +67,6 @@ module "vm" {
       sku_size               = "Standard_DS1_v2"
       source_image_reference = var.vm_source_image_reference
     }
-
-    bak = {
-      admin_name             = "admin-bak"
-      admin_pass             = file("./mypass.txt")
-      os_disk                = var.vm_os_disk
-      sku_size               = "Standard_DS1_v2"
-      source_image_reference = var.vm_source_image_reference
-    }
   }
 }
 
@@ -91,3 +83,29 @@ resource "azurerm_storage_container" "tfstate" {
   name                 = "tfstate"
   storage_account_name = "tcnstfstate"
 }
+
+output "lb_public_ip" {
+  value = module.vnet.public_ip
+}
+
+output "vm_main_user" {
+  value = "admin_main"
+}
+
+output "vm_aux_user" {
+  value = "admin_aux"
+}
+
+output "vm_bak_user" {
+  value = "admin_bak"
+}
+
+output "vm_pass" {
+  value     = file("./mypass.txt")
+  sensitive = true
+}
+
+output "rg_location" {
+  value = var.project.rg.location
+}
+
