@@ -67,6 +67,14 @@ module "vm" {
       sku_size               = "Standard_DS1_v2"
       source_image_reference = var.vm_source_image_reference
     }
+
+    bak = {
+      admin_name             = "admin-bak"
+      admin_pass             = file("./mypass.txt")
+      os_disk                = var.vm_os_disk
+      sku_size               = "Standard_DS1_v2"
+      source_image_reference = var.vm_source_image_reference
+    }
   }
 }
 
@@ -81,10 +89,5 @@ resource "azurerm_storage_account" "tfstate" {
 
 resource "azurerm_storage_container" "tfstate" {
   name                 = "tfstate"
-  storage_account_name = "tcnstfstate"
-}
-
-resource "azurerm_storage_container" "tfstate2" {
-  name                 = "testcontainer"
   storage_account_name = "tcnstfstate"
 }
