@@ -9,10 +9,6 @@ terraform {
   required_version = ">= 1.1.0"
 }
 
-provider "azurerm" {
-  features {}
-}
-
 resource "azurerm_virtual_network" "deployment" {
   name                = "vnet-${var.proj.name}-${var.proj.env}"
   address_space       = ["10.0.0.0/28"]

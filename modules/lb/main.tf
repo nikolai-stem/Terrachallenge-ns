@@ -9,10 +9,6 @@ terraform {
   required_version = ">= 1.1.0"
 }
 
-provider "azurerm" {
-  features {}
-}
-
 resource "azurerm_lb" "deployment" {
   name                = "lb-${var.proj.name}-${var.proj.env}"
   resource_group_name = var.rg.name
